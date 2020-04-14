@@ -4,12 +4,16 @@ import axios from "axios"
 import { quantile, ln } from './utils/math'
 import moment from 'moment'
 import {VictoryLine, VictoryChart, VictoryBrushContainer, VictoryTooltip, createContainer, VictoryLegend} from 'victory'
+import MultiToggle from 'react-multi-toggle'
+
+const domainOptions = [{displayName: "Day", value: "day"}, {displayName: "Week", value: "week"}, {displayName: "Month", value: "month"}, {displayName: "Year", value: "year"}]
 
 const VictoryZoomVoronoiContainer = createContainer("zoom", "voronoi");
 
 function App() {
   const [data, setData] = useState({rMSSD: [{x: 1, y:2}], HFPWR: [{x: 1, y:2}], LFPWR: [{x: 1, y:2}]});
   const [selectedDomain, setSelectedDomain] = useState();
+  const [selectedDomainOption, setSelectedDomainOption] = useState("week");
 
 
 
@@ -40,9 +44,19 @@ function App() {
     setSelectedDomain({x: domain.x}) //set only the x domain
   }
 
+  const handleDomainOption = (option) => {
+    setSelectedDomainOption(option)
+    setSelectedDomain(setDomainDuration(option))
+  }
+
 return (
       
         <div>
+            <MultiToggle
+              options={domainOptions}
+              selectedOption={selectedDomainOption}
+              onSelectOption={handleDomainOption}
+          />
             <VictoryChart width={1000} height={700} scale={{x: "time"}}
               containerComponent={
                 <VictoryZoomVoronoiContainer responsive={false}

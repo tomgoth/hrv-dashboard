@@ -5,31 +5,35 @@ import { quantile, ln } from './utils/math'
 import moment from 'moment'
 import {VictoryLine, VictoryChart, VictoryBrushContainer, VictoryTooltip, createContainer, VictoryLegend} from 'victory'
 import MultiToggle from 'react-multi-toggle'
+import Spinner from './Spinner.js'
 
 const domainOptions = [{displayName: "Day", value: "day"}, {displayName: "Week", value: "week"}, {displayName: "Month", value: "month"}, {displayName: "Year", value: "year"}]
 
 const VictoryZoomVoronoiContainer = createContainer("zoom", "voronoi");
 
 function App() {
-  const [data, setData] = useState({rMSSD: [{x: 1, y:2}], HFPWR: [{x: 1, y:2}], LFPWR: [{x: 1, y:2}]});
+  const [data, setData] = useState({rMSSD: [{x: 1, y:2}]});
   const [selectedDomain, setSelectedDomain] = useState();
   const [selectedDomainOption, setSelectedDomainOption] = useState("week");
+  const [isLoading, setIsLoading] = useState(true)
 
 
 
   useEffect(() => {
-    axios.get('http://localhost:3001/recent')
+    axios.get(`${process.env.REACT_APP_BACKEND_URI}/recent`)
       .then((response) => {
         let r = response.data.data
         let rMSSDArr = r.map(datum => datum.rMSSD)
         let rMSSDData = r.map(datum => { return {label: `${datum.rMSSD.toFixed(0)}ms @ ${moment(datum.createdAt).format("MM/DD hh:mma")}` , y: datum.rMSSD, x: moment(datum.createdAt).toDate()} })
-        let HFPWRData = r.map(datum => { return {label: `${ln(datum.HFPWR).toFixed(2)} @ ${moment(datum.createdAt).format("MM/DD hh:mma")}` , y: ln(datum.HFPWR), x: moment(datum.createdAt).toDate()} })
-        let LFPWRData = r.map(datum => { return {label: `${ln(datum.LFPWR).toFixed(2)} @ ${moment(datum.createdAt).format("MM/DD hh:mma")}` , y: ln(datum.LFPWR), x: moment(datum.createdAt).toDate()} })
+        //let HFPWRData = r.map(datum => { return {label: `${ln(datum.HFPWR).toFixed(2)} @ ${moment(datum.createdAt).format("MM/DD hh:mma")}` , y: ln(datum.HFPWR), x: moment(datum.createdAt).toDate()} })
+        //let LFPWRData = r.map(datum => { return {label: `${ln(datum.LFPWR).toFixed(2)} @ ${moment(datum.createdAt).format("MM/DD hh:mma")}` , y: ln(datum.LFPWR), x: moment(datum.createdAt).toDate()} })
         let q66Data = [{x: rMSSDData[0].x, y: quantile(rMSSDArr, .66)}, {x: rMSSDData[rMSSDData.length - 1].x, y: quantile(rMSSDArr, .66)}]
         let q33Data = [{x: rMSSDData[0].x, y: quantile(rMSSDArr, .33)}, {x: rMSSDData[rMSSDData.length - 1].x, y: quantile(rMSSDArr, .33)}]
 
-        setData({rMSSD: rMSSDData, HFPWR: HFPWRData, LFPWR: LFPWRData, Q66: q66Data, Q33: q33Data});
+        setData({rMSSD: rMSSDData, Q66: q66Data, Q33: q33Data});
         setSelectedDomain(setDomainDuration("week"))
+
+        setIsLoading(false)
     
     })
   },[])
@@ -37,7 +41,10 @@ function App() {
   const setDomainDuration = (duration) => { //day, week, month, year
     let now = moment().toDate();
     let prev = moment().subtract(1, duration).toDate();
-    return {x: [prev, now]}
+    let domain = {x: [prev, now]}
+    let maxY = data.rMSSD.filter(datum => datum.x > domain.x[0] && datum.x < domain.x[1]).reduce((maxY, datum) => (datum.y > maxY) ? datum.y : maxY, 0)
+    if (maxY > 0) { domain.y = [0, maxY + 30] }
+    return domain
   }
 
   const handleZoom = (domain) => {
@@ -49,20 +56,27 @@ function App() {
     setSelectedDomain(setDomainDuration(option))
   }
 
+if(isLoading) {
+    return <Spinner />
+}
+
 return (
       
-        <div>
+        <div>            
             <MultiToggle
               options={domainOptions}
               selectedOption={selectedDomainOption}
               onSelectOption={handleDomainOption}
-          />
+            />
             <VictoryChart width={1000} height={700} scale={{x: "time"}}
+              animate={{
+                duration: 1000,
+                onLoad: { duration: 250 }
+              }}
               containerComponent={
-                <VictoryZoomVoronoiContainer responsive={false}
-                  zoomDimension="x"
-                  zoomDomain={selectedDomain}
-                  onZoomDomainChange={handleZoom}
+                <VictoryZoomVoronoiContainer responsive={true}
+                  allowZoom={false}
+                  zoomDomain={selectedDomain}              
                 />
               }
             >
@@ -107,7 +121,7 @@ return (
               padding={{top: 0, left: 50, right: 50, bottom: 30}}
               width={1000} height={100} scale={{x: "time"}}
               containerComponent={
-                <VictoryBrushContainer responsive={false}
+                <VictoryBrushContainer responsive={true}
                   brushDimension="x"
                   brushDomain={selectedDomain}
                   onBrushDomainChange={handleZoom}
@@ -125,12 +139,15 @@ return (
               />
             </VictoryChart>
 
-            <VictoryChart width={1000} height={700} scale={{x: "time"}}
+            {/* <VictoryChart width={1000} height={700} scale={{x: "time"}}
+              animate={{
+                duration: 1000,
+                onLoad: { duration: 1000 }
+              }}
               containerComponent={
-                <VictoryZoomVoronoiContainer responsive={false}
-                  zoomDimension="x"
-                  zoomDomain={selectedDomain}
-                  onZoomDomainChange={handleZoom}
+                <VictoryZoomVoronoiContainer responsive={true}
+                  allowZoom={false}
+                  zoomDomain={selectedDomain}  
                 />
               }
             >
@@ -161,7 +178,7 @@ return (
                 data={data.LFPWR}
                 labelComponent={<VictoryTooltip/>}
               />
-            </VictoryChart >
+            </VictoryChart > */}
         </div>)
   }
   

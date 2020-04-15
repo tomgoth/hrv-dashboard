@@ -1,5 +1,7 @@
 export const asc = arr => arr.sort((a, b) => a - b);
 
+export const max = arr => asc(arr)[arr.length - 1];
+
 export const sum = arr => arr.reduce((a, b) => a + b, 0);
 
 export const mean = arr => sum(arr) / arr.length;

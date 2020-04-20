@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import './App.css'
 import axios from "axios"
-import { quantile, ln } from './utils/math'
+import { quantile } from './utils/math'
 import moment from 'moment'
 import {VictoryLine, VictoryChart, VictoryBrushContainer, VictoryTooltip, createContainer, VictoryLegend} from 'victory'
 import MultiToggle from 'react-multi-toggle'
@@ -12,12 +12,11 @@ const domainOptions = [{displayName: "Day", value: "day"}, {displayName: "Week",
 const VictoryZoomVoronoiContainer = createContainer("zoom", "voronoi");
 
 function App() {
-  const [data, setData] = useState({rMSSD: [{x: 1, y:2}]});
+  const [data, setData] = useState();
   const [selectedDomain, setSelectedDomain] = useState();
   const [selectedDomainOption, setSelectedDomainOption] = useState("week");
   const [isLoading, setIsLoading] = useState(true)
-
-  
+  const [average, setAverage] = useState(0);
 
 
 
@@ -33,29 +32,45 @@ function App() {
         let q33Data = [{x: rMSSDData[0].x, y: quantile(rMSSDArr, .33)}, {x: rMSSDData[rMSSDData.length - 1].x, y: quantile(rMSSDArr, .33)}]
 
         setData({rMSSD: rMSSDData, Q66: q66Data, Q33: q33Data});
-        setSelectedDomain(setDomainDuration("week"))
+        let domain = setDomainDuration("week", rMSSDData)
+        setSelectedDomain(domain)
+        setAverageFromDomain(domain, rMSSDData)  
 
         setIsLoading(false)
     
     })
+    
   },[])
 
-  const setDomainDuration = (duration) => { //day, week, month, year
+  const setDomainDuration = (duration, dataArr) => { //day, week, month, year
     let now = moment().toDate();
     let prev = moment().subtract(1, duration).toDate();
     let domain = {x: [prev, now]}
-    let maxY = data.rMSSD.filter(datum => datum.x > domain.x[0] && datum.x < domain.x[1]).reduce((maxY, datum) => (datum.y > maxY) ? datum.y : maxY, 0)
+    let maxY = dataArr.filter(datum => datum.x > domain.x[0] && datum.x < domain.x[1]).reduce((maxY, datum) => (datum.y > maxY) ? datum.y : maxY, 0)
     if (maxY > 0) { domain.y = [0, maxY + 30] }
+    
     return domain
+  }
+
+  const setAverageFromDomain = (domain, dataArr) => {
+    let filtered = dataArr.filter(datum => datum.x > domain.x[0] && datum.x < domain.x[1])
+    if (filtered.length > 0) {
+      let avg = filtered.reduce((sum, datum) => sum + datum.y, 0)/filtered.length
+      
+      setAverage(avg.toFixed(1))
+    }
   }
 
   const handleZoom = (domain) => {
     setSelectedDomain({x: domain.x}) //set only the x domain
+    setAverageFromDomain(domain, data.rMSSD)
   }
 
   const handleDomainOption = (option) => {
     setSelectedDomainOption(option)
-    setSelectedDomain(setDomainDuration(option))
+    let domain = setDomainDuration(option, data.rMSSD)
+    setAverageFromDomain(domain, data.rMSSD)
+    setSelectedDomain(domain)
   }
 
 if(isLoading) {
@@ -70,6 +85,8 @@ return (
               selectedOption={selectedDomainOption}
               onSelectOption={handleDomainOption}
             />
+            <h5>AVERAGE</h5>
+            <h2>{average} </h2>
             <VictoryChart width={1000} height={700} scale={{x: "time"}}
               animate={{
                 duration: 1000,
